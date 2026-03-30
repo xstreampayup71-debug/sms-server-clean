@@ -11,7 +11,7 @@ app.set('trust proxy', true);
 const ipHits = {};
 
 app.use((req, res, next) => {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
     // count hits
     ipHits[ip] = (ipHits[ip] || 0) + 1;
