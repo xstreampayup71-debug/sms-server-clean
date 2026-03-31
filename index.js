@@ -7,21 +7,30 @@ app.use(express.json());
 // 🔥 PROXY FIX
 app.set("trust proxy", true);
 
-// 🔥 FIREBASE INIT
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+// 🔥 LOAD BOTH JSON
+const adminJson = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT); // admin app
+const detectorJson = JSON.parse(process.env.SERVICE_ACCOUNT); // ip detector
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+// 🔥 INIT ADMIN APP (old wala — SMS/call)
+const adminApp = admin.initializeApp({
+  credential: admin.credential.cert(adminJson)
+}, "adminApp");
+
+// 🔥 INIT IP DETECTOR APP (main wala)
+const detectorApp = admin.initializeApp({
+  credential: admin.credential.cert(detectorJson),
   databaseURL: "https://ip-detector-6a30f-default-rtdb.firebaseio.com/"
-});
+}, "detectorApp");
 
-const db = admin.database();
+// 🔥 USE DETECTOR PROJECT
+const db = admin.database(detectorApp);
+const messaging = admin.messaging(detectorApp);
 
 // 🔥 IP TRACK SYSTEM
 const ipHits = {};
 const alertedIPs = {};
 
-// 🔥 NEW FCM SEND FUNCTION (MULTI TOKEN)
+// 🔥 FCM SEND FUNCTION
 async function sendFCM(ip, type) {
   try {
     const snapshot = await db.ref("tokens").once("value");
@@ -36,7 +45,7 @@ async function sendFCM(ip, type) {
       const token = tokens[key];
 
       try {
-        await admin.messaging().send({
+        await messaging.send({
           token: token,
           android: {
             priority: "high"
@@ -72,7 +81,7 @@ app.use(async (req, res, next) => {
   console.log("URL:", req.url);
   console.log("Hits:", ipHits[ip]);
 
-  // 🔥 VISIT ALERT (only once)
+  // 🔥 VISIT ALERT
   if (!alertedIPs[ip]) {
     alertedIPs[ip] = true;
 
@@ -126,7 +135,7 @@ app.post("/send", async (req, res) => {
   }
 
   try {
-    await admin.messaging().send({
+    await messaging.send({
       token: token,
       android: {
         priority: "high"
